@@ -4,6 +4,7 @@ const dbFile = "./chat.db"
 const exists = fs.existsSync(dbFile)
 const sqlite3 = require("sqlite3").verbose()
 const dbWrapper = require("sqlite")
+const crypto = require("crypto")
 
 let db 
 
@@ -46,26 +47,43 @@ dbWrapper
         }
     });
 
-    module.exports = {
-        getMessages: async () => {
-            try {
-                return await db.all(
-                    `SELECT message_id, content, login, user_id from message
-                    JOIN user ON message.author = user.user_id`
-                );
-            } catch (dbError) {
-                console.error(dbError.message);
-            }
-        },
-        addMessage: async (msg, userId) => {
-            await db.run(
-                `INSERT INTO message (content, author) VALUES (?, ?)`,
-                [msg, userId]
+module.exports = {
+    getMessages: async () => {
+        try {
+            return await db.all(
+                `SELECT message_id, content, login, user_id from message
+                JOIN user ON message.author = user.user_id`
             );
+        } catch (dbError) {
+            console.error(dbError.message);
         }
-    };
+    },
+    addMessage: async (msg, userId) => {
+        await db.run(
+            `INSERT INTO message (content, author) VALUES (?, ?)`,
+            [msg, userId]
+        );
+    },
+    idUserExist: async (login) => {
+        const candidate = await db.all(`SELECT * FROM user WHERE login = ?`, [login])
+        return !!candidate.length
+    },
+    addUser: async (user) => {
+        await db.run(`INSERT INTO user (login, password) VALUES (?, ?)`, [user.login, user.password])
+    },
+    getAuthToken: async (user) => {
+        const candidate = await db.all(`SELECT * FROM user WHERE login = ?`, [user.login])
+        if (!candidate.length) {
+            throw "Wrong login"
+        }
+        if (candidate[0].password !== user.password) {
+            throw "Wrong password"
+        }
+        return candidate[0].user_id + "." + candidate[0].login + '.' + crypto.randomBytes(20).toString('hex')
+    }
+};
 
-
+    
 
 
 
